@@ -19,6 +19,14 @@ export default {
 		},
 		extend: {
 			colors: {
+                whisky: {
+                    amber: '#D4A76A',
+                    gold: '#C88A3D',
+                    brown: '#3E2723',
+                    wood: '#5D4037',
+                    light: '#F5F5DC',
+                    accent: '#FFD700',
+                },
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
