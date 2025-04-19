@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -36,38 +35,7 @@ const Index = () => {
               </div>
               
               <div className="md:w-1/2">
-                <div className="relative">
-                  <div className="absolute -inset-4 rounded-full bg-whisky-gold/20 blur-3xl" />
-                  <div className="relative bg-white rounded-3xl shadow-2xl p-6 md:p-8 border border-whisky-amber/10">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-whisky-amber grid place-items-center flex-shrink-0">
-                        <span className="font-bold text-white text-xl">B</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-whisky-brown">Bob's Tasting Notes</p>
-                        <p className="text-whisky-wood/70 text-sm mt-1">
-                          Based on your collection, I'd recommend exploring these Speyside expressions 
-                          that complement your preference for sherry-influenced malts...
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 space-y-4">
-                      <div className="p-3 border border-whisky-amber/10 rounded-lg bg-whisky-light/20">
-                        <p className="text-sm text-whisky-brown">
-                          <span className="font-medium">GlenDronach 15 Revival:</span> Given your 
-                          appreciation for rich, sherried whiskies with dried fruit notes.
-                        </p>
-                      </div>
-                      <div className="p-3 border border-whisky-amber/10 rounded-lg bg-whisky-light/20">
-                        <p className="text-sm text-whisky-brown">
-                          <span className="font-medium">Aberlour A'bunadh:</span> To explore 
-                          cask-strength expressions with similar flavor profiles.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <BaxusImport />
               </div>
             </div>
           </div>
