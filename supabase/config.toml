@@ -1,1 +1,5 @@
+
 project_id = "zrsijxvhbflbbwodtaaj"
+
+[functions.baxus-proxy]
+verify_jwt = false

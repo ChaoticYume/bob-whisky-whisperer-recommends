@@ -8,6 +8,9 @@ import WhiskyCard from "@/components/WhiskyCard";
 import RecommendationFilter from "@/components/RecommendationFilter";
 import { WhiskyBottle } from "@/types/whisky";
 import { generateRecommendations } from "@/utils/whiskyAnalysis";
+import { getAiRecommendations } from "@/services/baxusApi";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 const mockDatabaseBottles: WhiskyBottle[] = [
   {
@@ -308,8 +311,10 @@ const Analyze = () => {
   const [recommendations, setRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
   const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const { toast } = useToast();
   
-  const handleFileUpload = (bottles: WhiskyBottle[]) => {
+  const handleFileUpload = async (bottles: WhiskyBottle[]) => {
     setUserBottles(bottles);
     
     // Generate recommendations based on uploaded collection
@@ -326,6 +331,57 @@ const Analyze = () => {
   
   const handleFilterRecommendations = (filtered: { bottle: WhiskyBottle; reason: string }[]) => {
     setFilteredRecommendations(filtered);
+  };
+
+  const handleAiRecommendations = async () => {
+    if (userBottles.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please upload your collection first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoadingAi(true);
+      toast({
+        title: "Processing",
+        description: "Getting AI recommendations based on your collection...",
+      });
+
+      const aiRecommendations = await getAiRecommendations(userBottles);
+      
+      // Convert AI recommendations to the format expected by the UI
+      const formattedRecommendations = aiRecommendations.map((rec: any) => ({
+        bottle: {
+          id: `ai-${Math.random().toString(36).substring(2, 9)}`,
+          name: rec.name,
+          distillery: rec.distillery,
+          country: "AI Recommendation",
+          type: "AI Recommendation",
+          abv: 43,
+          flavor_profile: rec.flavor_profile || {},
+        },
+        reason: rec.reason,
+      }));
+      
+      setRecommendations(formattedRecommendations);
+      setFilteredRecommendations(formattedRecommendations);
+      
+      toast({
+        title: "Success!",
+        description: "AI recommendations generated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get AI recommendations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAi(false);
+    }
   };
   
   return (
@@ -359,17 +415,29 @@ const Analyze = () => {
               </div>
               
               <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-whisky-amber flex items-center justify-center flex-shrink-0">
-                    <span className="font-bold text-white text-xl">B</span>
+                <div className="flex items-center gap-4 justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-whisky-amber flex items-center justify-center flex-shrink-0">
+                      <span className="font-bold text-white text-xl">B</span>
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-whisky-brown">
+                        Bob's Recommendations
+                      </h2>
+                      <p className="text-whisky-wood/70">
+                        Based on your collection, I think you might enjoy these bottles:
+                      </p>
+                    </div>
                   </div>
+                  
                   <div>
-                    <h2 className="text-2xl font-bold text-whisky-brown">
-                      Bob's Recommendations
-                    </h2>
-                    <p className="text-whisky-wood/70">
-                      Based on your collection, I think you might enjoy these bottles:
-                    </p>
+                    <Button 
+                      onClick={handleAiRecommendations} 
+                      disabled={isLoadingAi}
+                      className="bg-whisky-gold hover:bg-whisky-amber text-white"
+                    >
+                      {isLoadingAi ? "Getting AI Recommendations..." : "Get AI Recommendations"}
+                    </Button>
                   </div>
                 </div>
                 
