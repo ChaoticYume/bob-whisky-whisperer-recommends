@@ -29,14 +29,28 @@ serve(async (req) => {
       }
     });
     
+    // Handle Baxus API responses based on status code
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Baxus API error: ${response.status} - ${errorText}`);
+      const errorData = await response.json().catch(() => null);
+      console.error(`Baxus API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      
+      // Parse and return more user-friendly error messages
+      let errorMessage = 'Failed to fetch data from Baxus API';
+      if (errorData?.message) {
+        if (errorData.message.includes("public share settings disabled")) {
+          errorMessage = "This Baxus user has disabled public sharing. Ask them to enable it in their Baxus settings.";
+        } else if (errorData.message.includes("not found")) {
+          errorMessage = "This Baxus username was not found. Please check the spelling and try again.";
+        } else {
+          errorMessage = errorData.message;
+        }
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to fetch data from Baxus API',
+          error: errorMessage,
           status: response.status,
-          details: errorText
+          originalError: errorData
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
       );
@@ -59,7 +73,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Unknown error occurred' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

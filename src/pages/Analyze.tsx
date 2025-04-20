@@ -10,7 +10,9 @@ import { WhiskyBottle } from "@/types/whisky";
 import { generateRecommendations } from "@/utils/whiskyAnalysis";
 import { getAiRecommendations } from "@/services/baxusApi";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const mockDatabaseBottles: WhiskyBottle[] = [
   {
@@ -312,16 +314,28 @@ const Analyze = () => {
   const [filteredRecommendations, setFilteredRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
   
   const handleFileUpload = async (bottles: WhiskyBottle[]) => {
+    setErrorMessage(null);
     setUserBottles(bottles);
+    
+    if (bottles.length === 0) {
+      setErrorMessage("Your uploaded collection is empty. Please upload a file with whisky bottle data.");
+      return;
+    }
     
     // Generate recommendations based on uploaded collection
     const newRecommendations = generateRecommendations(bottles, mockDatabaseBottles);
     setRecommendations(newRecommendations);
     setFilteredRecommendations(newRecommendations);
     setAnalysisComplete(true);
+    
+    toast({
+      title: "Collection Processed",
+      description: `Analyzed ${bottles.length} bottles and generated ${newRecommendations.length} recommendations.`,
+    });
     
     // Scroll to results
     setTimeout(() => {
@@ -334,23 +348,22 @@ const Analyze = () => {
   };
 
   const handleAiRecommendations = async () => {
+    setErrorMessage(null);
+    
     if (userBottles.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please upload your collection first",
-        variant: "destructive",
-      });
+      setErrorMessage("Your whisky collection is empty. Please upload your collection first.");
       return;
     }
 
     try {
       setIsLoadingAi(true);
-      toast({
-        title: "Processing",
-        description: "Getting AI recommendations based on your collection...",
-      });
-
+      
       const aiRecommendations = await getAiRecommendations(userBottles);
+      
+      if (!aiRecommendations || aiRecommendations.length === 0) {
+        setErrorMessage("No AI recommendations could be generated. Try again or use the standard recommendations.");
+        return;
+      }
       
       // Convert AI recommendations to the format expected by the UI
       const formattedRecommendations = aiRecommendations.map((rec: any) => ({
@@ -368,17 +381,9 @@ const Analyze = () => {
       
       setRecommendations(formattedRecommendations);
       setFilteredRecommendations(formattedRecommendations);
-      
-      toast({
-        title: "Success!",
-        description: "AI recommendations generated successfully",
-      });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get AI recommendations",
-        variant: "destructive",
-      });
+      console.error("AI recommendation error:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Failed to get AI recommendations");
     } finally {
       setIsLoadingAi(false);
     }
@@ -399,6 +404,14 @@ const Analyze = () => {
               and recommend new bottles that perfectly match your taste profile.
             </p>
           </div>
+          
+          {errorMessage && (
+            <Alert variant="destructive" className="mb-6 max-w-3xl mx-auto">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
           
           <div className="mb-16">
             <FileUpload onUpload={handleFileUpload} />
@@ -433,7 +446,7 @@ const Analyze = () => {
                   <div>
                     <Button 
                       onClick={handleAiRecommendations} 
-                      disabled={isLoadingAi}
+                      disabled={isLoadingAi || userBottles.length === 0}
                       className="bg-whisky-gold hover:bg-whisky-amber text-white"
                     >
                       {isLoadingAi ? "Getting AI Recommendations..." : "Get AI Recommendations"}
@@ -459,7 +472,7 @@ const Analyze = () => {
                 ) : (
                   <div className="text-center py-10">
                     <p className="text-whisky-wood/70">No recommendations match your filters.</p>
-                    <p className="text-whisky-wood/70 mt-1">Try adjusting your filter criteria.</p>
+                    <p className="text-whisky-wood/70 mt-1">Try adjusting your filter criteria or getting AI recommendations.</p>
                   </div>
                 )}
               </div>

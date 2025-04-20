@@ -43,6 +43,14 @@ serve(async (req) => {
     
     console.log("User profile generated:", JSON.stringify(userProfile));
     
+    // Check if profile has enough data to make recommendations
+    const hasRegions = userProfile.regions && userProfile.regions.length > 0;
+    const hasFlavors = userProfile.topFlavors && userProfile.topFlavors.length > 0;
+    
+    if (!hasRegions && !hasFlavors) {
+      console.log("Not enough profile data to generate recommendations");
+    }
+    
     // Prepare prompt for AI recommendations
     const prompt = `Based on this whisky collection profile: ${JSON.stringify(userProfile)}, 
                    recommend 5 whisky bottles that match this taste profile. 
@@ -64,12 +72,19 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("HuggingFace API error:", errorText);
+      let errorText = 'Failed to get recommendations from HuggingFace API';
+      try {
+        const errorData = await response.json();
+        errorText = errorData.error || errorText;
+        console.error("HuggingFace API error:", errorText);
+      } catch (e) {
+        errorText = await response.text();
+        console.error("HuggingFace API error (raw):", errorText);
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to get recommendations from HuggingFace API',
-          details: errorText
+          error: errorText
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
       );
@@ -81,13 +96,19 @@ serve(async (req) => {
     // Process the AI response
     const recommendations = processAiRecommendations(aiResult);
     
+    // If no recommendations were generated, create fallback recommendations
     if (recommendations.length === 0) {
+      console.log("No recommendations parsed from AI response, generating fallbacks");
+      
+      const fallbackRecommendations = generateFallbackRecommendations(userProfile);
+      
       return new Response(
         JSON.stringify({ 
-          error: 'Could not generate meaningful recommendations, please try again',
-          aiResponse: aiResult
+          recommendations: fallbackRecommendations,
+          ai_response_raw: aiResult,
+          note: "Used fallback recommendations due to AI processing issue"
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
@@ -98,7 +119,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Unknown error occurred' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
@@ -116,12 +137,14 @@ function generateUserProfile(bottles) {
   
   const flavors = {};
   bottles.forEach(bottle => {
-    Object.entries(bottle.flavor_profile || {}).forEach(([flavor, value]) => {
-      if (value !== undefined) {
-        if (!flavors[flavor]) flavors[flavor] = [];
-        flavors[flavor].push(value);
-      }
-    });
+    if (bottle.flavor_profile) {
+      Object.entries(bottle.flavor_profile || {}).forEach(([flavor, value]) => {
+        if (value !== undefined) {
+          if (!flavors[flavor]) flavors[flavor] = [];
+          flavors[flavor].push(value);
+        }
+      });
+    }
   });
   
   return {
@@ -151,10 +174,27 @@ function processAiRecommendations(aiResult) {
   const recommendations = [];
   
   // Improved parsing of recommendations from AI text
+  // Try to match patterns like "Bottle Name by Distillery" or "Bottle Name from Distillery"
   const bottleMatches = text.match(/[\w\s'",-]+(?:by|from)\s+[\w\s'",-]+/gi) || [];
   
   if (bottleMatches.length === 0) {
-    console.log("No bottle matches found in AI text");
+    console.log("No bottle matches found in AI text, trying alternative parsing");
+    // Alternative parsing logic - look for numbered lists
+    const numberedItems = text.match(/\d+\.\s+([^\n]+)/g);
+    if (numberedItems && numberedItems.length > 0) {
+      numberedItems.forEach(item => {
+        // Extract just the whisky name - assume first part is the name
+        const cleanItem = item.replace(/^\d+\.\s+/, '').trim();
+        const parts = cleanItem.split(/[-–—:]/);
+        if (parts.length > 0) {
+          const name = parts[0].trim();
+          const distillery = parts.length > 1 ? parts[1].trim() : "Unknown Distillery";
+          
+          recommendations.push(createRecommendation(name, distillery));
+        }
+      });
+    }
+    return recommendations;
   }
   
   bottleMatches.slice(0, 5).forEach(match => {
@@ -164,22 +204,51 @@ function processAiRecommendations(aiResult) {
     const name = parts[0].trim();
     const distillery = parts[1].trim();
     
-    // Generate random flavor profile based on common whisky characteristics
-    const getRandomFlavor = () => Math.floor(Math.random() * 10);
-    
-    recommendations.push({
-      name,
-      distillery,
-      flavor_profile: {
-        sweet: getRandomFlavor(),
-        smoky: getRandomFlavor(),
-        fruity: getRandomFlavor(),
-        spicy: getRandomFlavor(),
-        floral: getRandomFlavor()
-      },
-      reason: `Based on your collection's flavor profile, this ${distillery} whisky should complement your preferences.`
-    });
+    recommendations.push(createRecommendation(name, distillery));
   });
   
   return recommendations;
+}
+
+// Helper to create a recommendation with random flavor profile
+function createRecommendation(name, distillery) {
+  // Generate random flavor profile based on common whisky characteristics
+  const getRandomFlavor = () => Math.floor(Math.random() * 10);
+  
+  return {
+    name,
+    distillery,
+    flavor_profile: {
+      sweet: getRandomFlavor(),
+      smoky: getRandomFlavor(),
+      fruity: getRandomFlavor(),
+      spicy: getRandomFlavor(),
+      floral: getRandomFlavor()
+    },
+    reason: `Based on your collection's flavor profile, this ${distillery} whisky should complement your preferences.`
+  };
+}
+
+// Generate fallback recommendations if AI fails
+function generateFallbackRecommendations(userProfile) {
+  const fallbackWhiskies = [
+    { name: "Lagavulin 16", distillery: "Lagavulin", region: "Islay", flavors: { smoky: 9, peaty: 8, rich: 7 } },
+    { name: "Macallan 12", distillery: "Macallan", region: "Speyside", flavors: { sweet: 8, fruity: 7, rich: 8 } },
+    { name: "Redbreast 12", distillery: "Redbreast", region: "Ireland", flavors: { spicy: 7, fruity: 6, sweet: 7 } },
+    { name: "Highland Park 18", distillery: "Highland Park", region: "Islands", flavors: { sweet: 7, smoky: 5, floral: 6 } },
+    { name: "Buffalo Trace", distillery: "Buffalo Trace", region: "Kentucky", flavors: { sweet: 8, vanilla: 7, oak: 6 } }
+  ];
+  
+  return fallbackWhiskies.map(whisky => ({
+    name: whisky.name,
+    distillery: whisky.distillery,
+    flavor_profile: {
+      sweet: whisky.flavors.sweet || Math.floor(Math.random() * 10),
+      smoky: whisky.flavors.smoky || Math.floor(Math.random() * 10),
+      fruity: whisky.flavors.fruity || Math.floor(Math.random() * 10),
+      spicy: whisky.flavors.spicy || Math.floor(Math.random() * 10),
+      floral: whisky.flavors.floral || Math.floor(Math.random() * 10)
+    },
+    reason: `Recommended as a quality ${whisky.region || "whisky"} that would complement your collection.`
+  }));
 }
