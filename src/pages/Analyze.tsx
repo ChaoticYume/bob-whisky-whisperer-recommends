@@ -1,18 +1,13 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FileUpload from "@/components/FileUpload";
-import CollectionSummary from "@/components/CollectionSummary";
-import WhiskyCard from "@/components/WhiskyCard";
-import RecommendationFilter from "@/components/RecommendationFilter";
 import { WhiskyBottle } from "@/types/whisky";
 import { generateRecommendations } from "@/utils/whiskyAnalysis";
 import { getAiRecommendations } from "@/services/baxusApi";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import AnalysisHeader from "@/components/AnalysisHeader";
+import AnalysisResults from "@/components/AnalysisResults";
 
 const mockDatabaseBottles: WhiskyBottle[] = [
   {
@@ -311,7 +306,6 @@ const mockDatabaseBottles: WhiskyBottle[] = [
 const Analyze = () => {
   const [userBottles, setUserBottles] = useState<WhiskyBottle[]>([]);
   const [recommendations, setRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
-  const [filteredRecommendations, setFilteredRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -326,10 +320,13 @@ const Analyze = () => {
       return;
     }
     
-    // Generate recommendations based on uploaded collection
     const newRecommendations = generateRecommendations(bottles, mockDatabaseBottles);
     setRecommendations(newRecommendations);
-    setFilteredRecommendations(newRecommendations);
+    
+    if (typeof window !== 'undefined' && (window as any).updateWhiskyRecommendations) {
+      (window as any).updateWhiskyRecommendations(newRecommendations);
+    }
+    
     setAnalysisComplete(true);
     
     toast({
@@ -337,14 +334,9 @@ const Analyze = () => {
       description: `Analyzed ${bottles.length} bottles and generated ${newRecommendations.length} recommendations.`,
     });
     
-    // Scroll to results
     setTimeout(() => {
       document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
-  };
-  
-  const handleFilterRecommendations = (filtered: { bottle: WhiskyBottle; reason: string }[]) => {
-    setFilteredRecommendations(filtered);
   };
 
   const handleAiRecommendations = async () => {
@@ -365,7 +357,6 @@ const Analyze = () => {
         return;
       }
       
-      // Convert AI recommendations to the format expected by the UI
       const formattedRecommendations = aiRecommendations.map((rec: any) => ({
         bottle: {
           id: `ai-${Math.random().toString(36).substring(2, 9)}`,
@@ -380,7 +371,10 @@ const Analyze = () => {
       }));
       
       setRecommendations(formattedRecommendations);
-      setFilteredRecommendations(formattedRecommendations);
+      
+      if (typeof window !== 'undefined' && (window as any).updateWhiskyRecommendations) {
+        (window as any).updateWhiskyRecommendations(formattedRecommendations);
+      }
     } catch (error) {
       console.error("AI recommendation error:", error);
       setErrorMessage(error instanceof Error ? error.message : "Failed to get AI recommendations");
@@ -395,88 +389,18 @@ const Analyze = () => {
       
       <main className="flex-grow whisky-bg py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-whisky-brown mb-4">
-              Analyze Your Whisky Collection
-            </h1>
-            <p className="text-whisky-wood/80">
-              Upload your whisky collection data in CSV format, and Bob will analyze your preferences 
-              and recommend new bottles that perfectly match your taste profile.
-            </p>
-          </div>
-          
-          {errorMessage && (
-            <Alert variant="destructive" className="mb-6 max-w-3xl mx-auto">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
-          )}
+          <AnalysisHeader errorMessage={errorMessage} />
           
           <div className="mb-16">
             <FileUpload onUpload={handleFileUpload} />
           </div>
           
           {analysisComplete && (
-            <div id="results" className="space-y-16 pt-8">
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-whisky-brown mb-6">
-                  Your Collection Analysis
-                </h2>
-                
-                <CollectionSummary bottles={userBottles} />
-              </div>
-              
-              <div className="space-y-6">
-                <div className="flex items-center gap-4 justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-whisky-amber flex items-center justify-center flex-shrink-0">
-                      <span className="font-bold text-white text-xl">B</span>
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-whisky-brown">
-                        Bob's Recommendations
-                      </h2>
-                      <p className="text-whisky-wood/70">
-                        Based on your collection, I think you might enjoy these bottles:
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Button 
-                      onClick={handleAiRecommendations} 
-                      disabled={isLoadingAi || userBottles.length === 0}
-                      className="bg-whisky-gold hover:bg-whisky-amber text-white"
-                    >
-                      {isLoadingAi ? "Getting AI Recommendations..." : "Get AI Recommendations"}
-                    </Button>
-                  </div>
-                </div>
-                
-                <RecommendationFilter 
-                  recommendations={recommendations} 
-                  onFilter={handleFilterRecommendations} 
-                />
-                
-                {filteredRecommendations.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredRecommendations.map((recommendation) => (
-                      <WhiskyCard 
-                        key={recommendation.bottle.id}
-                        bottle={recommendation.bottle}
-                        reason={recommendation.reason}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-10">
-                    <p className="text-whisky-wood/70">No recommendations match your filters.</p>
-                    <p className="text-whisky-wood/70 mt-1">Try adjusting your filter criteria or getting AI recommendations.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <AnalysisResults 
+              userBottles={userBottles}
+              onGetAiRecommendations={handleAiRecommendations}
+              isLoadingAi={isLoadingAi}
+            />
           )}
         </div>
       </main>

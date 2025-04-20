@@ -44,7 +44,7 @@ export default function BaxusImport() {
       if (!barData || !barData.bottles || barData.bottles.length === 0) {
         setImportError("No bottles found in this Baxus bar");
         toast({
-          title: "No data found",
+          title: "Empty Collection",
           description: "This Baxus profile doesn't have any bottles in its collection.",
           variant: "destructive",
         });
@@ -78,7 +78,7 @@ export default function BaxusImport() {
       const errorMessage = error instanceof Error ? error.message : "Failed to import bar data";
       setImportError(errorMessage);
       toast({
-        title: "Error",
+        title: "Import Failed",
         description: errorMessage,
         variant: "destructive",
       });

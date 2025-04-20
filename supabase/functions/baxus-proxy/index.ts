@@ -46,13 +46,14 @@ serve(async (req) => {
         }
       }
       
+      // Return a 200 status with detailed error info to handle gracefully in the frontend
       return new Response(
         JSON.stringify({ 
           error: errorMessage,
           status: response.status,
           originalError: errorData
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
     
@@ -62,7 +63,7 @@ serve(async (req) => {
     if (!data || !data.bottles || data.bottles.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No bottles found in this Baxus bar' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
     
@@ -74,7 +75,7 @@ serve(async (req) => {
     console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Unknown error occurred' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   }
 });

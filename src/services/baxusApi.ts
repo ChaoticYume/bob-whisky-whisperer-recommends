@@ -18,14 +18,19 @@ export async function fetchBaxusBarData(username: string) {
     
     // Handle errors returned by the edge function with a 2xx status code but with an error property
     if (data && data.error) {
-      console.error('Baxus service error:', data.error);
+      console.error('Baxus API error:', data.error);
       throw new Error(data.error);
     }
     
     return data;
   } catch (error) {
     console.error('Error fetching Baxus bar data:', error);
-    throw error instanceof Error ? error : new Error('Failed to fetch bar data');
+    // Extract the error message if it's available
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Failed to fetch bar data';
+      
+    throw new Error(errorMessage);
   }
 }
 
