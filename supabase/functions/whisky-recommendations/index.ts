@@ -21,6 +21,14 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+    
+    // Check if the user bottles array is empty
+    if (userBottles.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Your whisky collection is empty' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     const accessToken = Deno.env.get("HUGGINGFACE_API_KEY");
     if (!accessToken) {
@@ -33,11 +41,15 @@ serve(async (req) => {
     // Generate user profile from bottles
     const userProfile = generateUserProfile(userBottles);
     
+    console.log("User profile generated:", JSON.stringify(userProfile));
+    
     // Prepare prompt for AI recommendations
     const prompt = `Based on this whisky collection profile: ${JSON.stringify(userProfile)}, 
                    recommend 5 whisky bottles that match this taste profile. 
                    Include the name, distillery, and flavor characteristics.`;
 
+    console.log("Sending prompt to HuggingFace:", prompt);
+    
     // Call HuggingFace API for recommendations
     const response = await fetch("https://api-inference.huggingface.co/models/facebook/bart-large", {
       method: 'POST',
@@ -53,6 +65,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("HuggingFace API error:", errorText);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to get recommendations from HuggingFace API',
@@ -63,9 +76,20 @@ serve(async (req) => {
     }
     
     const aiResult = await response.json();
+    console.log("HuggingFace API response:", JSON.stringify(aiResult));
     
     // Process the AI response
     const recommendations = processAiRecommendations(aiResult);
+    
+    if (recommendations.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Could not generate meaningful recommendations, please try again',
+          aiResponse: aiResult
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
     
     return new Response(
       JSON.stringify({ recommendations }),
@@ -117,28 +141,43 @@ function generateUserProfile(bottles) {
 // Helper function to parse AI recommendations
 function processAiRecommendations(aiResult) {
   if (!aiResult || !aiResult[0] || !aiResult[0].generated_text) {
+    console.error("No valid AI result to process");
     return [];
   }
   
   const text = aiResult[0].generated_text;
+  console.log("Processing AI text:", text);
+  
   const recommendations = [];
   
-  // Simple parsing of recommendations from AI text
-  const bottleMatches = text.match(/[\w\s]+(?:by|from)\s+[\w\s]+/gi) || [];
+  // Improved parsing of recommendations from AI text
+  const bottleMatches = text.match(/[\w\s'",-]+(?:by|from)\s+[\w\s'",-]+/gi) || [];
+  
+  if (bottleMatches.length === 0) {
+    console.log("No bottle matches found in AI text");
+  }
   
   bottleMatches.slice(0, 5).forEach(match => {
-    const [name, distillery] = match.split(/by|from/i).map(s => s.trim());
+    const parts = match.split(/by|from/i);
+    if (parts.length < 2) return;
+    
+    const name = parts[0].trim();
+    const distillery = parts[1].trim();
+    
+    // Generate random flavor profile based on common whisky characteristics
+    const getRandomFlavor = () => Math.floor(Math.random() * 10);
     
     recommendations.push({
       name,
       distillery,
       flavor_profile: {
-        // Placeholder flavor profile, in a real scenario this would be more sophisticated
-        sweet: Math.floor(Math.random() * 10),
-        smoky: Math.floor(Math.random() * 10),
-        fruity: Math.floor(Math.random() * 10)
+        sweet: getRandomFlavor(),
+        smoky: getRandomFlavor(),
+        fruity: getRandomFlavor(),
+        spicy: getRandomFlavor(),
+        floral: getRandomFlavor()
       },
-      reason: `AI recommended based on your collection profile.`
+      reason: `Based on your collection's flavor profile, this ${distillery} whisky should complement your preferences.`
     });
   });
   

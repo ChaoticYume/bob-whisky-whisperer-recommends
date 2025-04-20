@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBaxusBarData } from "@/services/baxusApi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Info } from "lucide-react";
 
 const formSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -16,6 +18,7 @@ const formSchema = z.object({
 
 export default function BaxusImport() {
   const [isLoading, setIsLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -28,9 +31,25 @@ export default function BaxusImport() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
+      setImportError(null);
       
       // Fetch bar data from Baxus API
+      toast({
+        title: "Fetching data",
+        description: `Getting bar data for username: ${values.username}...`,
+      });
+      
       const barData = await fetchBaxusBarData(values.username);
+      
+      if (!barData || !barData.bottles || barData.bottles.length === 0) {
+        setImportError("No bottles found in this Baxus bar");
+        toast({
+          title: "No data found",
+          description: "This Baxus profile doesn't have any bottles in its collection.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Get the current user's ID
       const { data: { session } } = await supabase.auth.getSession();
@@ -52,13 +71,15 @@ export default function BaxusImport() {
       
       toast({
         title: "Success!",
-        description: "Your Baxus bar data has been imported successfully.",
+        description: `Imported ${barData.bottles.length} bottles from ${values.username}'s Baxus bar.`,
       });
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to import bar data";
+      setImportError(errorMessage);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to import bar data",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -69,6 +90,14 @@ export default function BaxusImport() {
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold text-whisky-brown mb-6">Import Your Baxus Bar</h2>
+      
+      {importError && (
+        <Alert variant="destructive" className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Import Failed</AlertTitle>
+          <AlertDescription>{importError}</AlertDescription>
+        </Alert>
+      )}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

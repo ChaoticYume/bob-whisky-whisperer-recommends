@@ -44,6 +44,14 @@ serve(async (req) => {
     
     const data = await response.json();
     
+    // Check if the bar data is empty
+    if (!data || !data.bottles || data.bottles.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No bottles found in this Baxus bar' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+    
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
