@@ -9,6 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 import AnalysisHeader from "@/components/AnalysisHeader";
 import AnalysisResults from "@/components/AnalysisResults";
 
+const STORAGE_KEYS = {
+  USER_BOTTLES: 'baxus_user_bottles',
+  RECOMMENDATIONS: 'baxus_recommendations',
+  ANALYSIS_COMPLETE: 'baxus_analysis_complete'
+} as const;
+
 const mockDatabaseBottles: WhiskyBottle[] = [
   {
     id: "db001",
@@ -304,12 +310,36 @@ const mockDatabaseBottles: WhiskyBottle[] = [
 ];
 
 const Analyze = () => {
-  const [userBottles, setUserBottles] = useState<WhiskyBottle[]>([]);
-  const [recommendations, setRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
-  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [userBottles, setUserBottles] = useState<WhiskyBottle[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.USER_BOTTLES);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [recommendations, setRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.RECOMMENDATIONS);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [analysisComplete, setAnalysisComplete] = useState<boolean>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.ANALYSIS_COMPLETE);
+    return stored ? JSON.parse(stored) : false;
+  });
+  
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USER_BOTTLES, JSON.stringify(userBottles));
+  }, [userBottles]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RECOMMENDATIONS, JSON.stringify(recommendations));
+  }, [recommendations]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ANALYSIS_COMPLETE, JSON.stringify(analysisComplete));
+  }, [analysisComplete]);
   
   const handleFileUpload = async (bottles: WhiskyBottle[]) => {
     setErrorMessage(null);
