@@ -1,8 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WhiskyBottle } from "@/types/whisky";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { SlidersHorizontal } from "lucide-react";
 
 interface RecommendationFilterProps {
   recommendations: { bottle: WhiskyBottle; reason: string }[];
@@ -10,10 +11,6 @@ interface RecommendationFilterProps {
 }
 
 const RecommendationFilter = ({ recommendations, onFilter }: RecommendationFilterProps) => {
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 200]);
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  
   // Extract all available regions and types
   const allRegions = Array.from(
     new Set(
@@ -30,15 +27,19 @@ const RecommendationFilter = ({ recommendations, onFilter }: RecommendationFilte
   // Calculate price min and max from recommendations
   const prices = recommendations
     .map((r) => r.bottle.price)
-    .filter((price): price is number => price !== undefined);
+    .filter((price): price is number => price !== undefined && price > 0);
   
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 200;
   
-  // Initialize price range with actual min and max
-  useState(() => {
+  const [priceRange, setPriceRange] = useState<[number, number]>([minPrice, maxPrice]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+
+  // Reset price range when recommendations change
+  useEffect(() => {
     setPriceRange([minPrice, maxPrice]);
-  });
+  }, [minPrice, maxPrice]);
   
   const handleRegionToggle = (region: string) => {
     setSelectedRegions((prev) => 
@@ -62,7 +63,7 @@ const RecommendationFilter = ({ recommendations, onFilter }: RecommendationFilte
     // Filter by price
     filtered = filtered.filter((r) => {
       const price = r.bottle.price;
-      if (price === undefined) return true;
+      if (price === undefined || price <= 0) return true;
       return price >= priceRange[0] && price <= priceRange[1];
     });
     
@@ -92,7 +93,10 @@ const RecommendationFilter = ({ recommendations, onFilter }: RecommendationFilte
   
   return (
     <div className="bg-white rounded-lg p-4 shadow-sm border border-whisky-amber/10 mb-6">
-      <h3 className="font-medium text-whisky-brown mb-4">Filter Recommendations</h3>
+      <div className="flex items-center gap-2 font-medium text-whisky-brown mb-4">
+        <SlidersHorizontal className="h-4 w-4" />
+        <h3>Filter Recommendations</h3>
+      </div>
       
       <div className="space-y-4">
         <div>
@@ -100,7 +104,7 @@ const RecommendationFilter = ({ recommendations, onFilter }: RecommendationFilte
           <Slider
             value={priceRange}
             min={minPrice}
-            max={maxPrice}
+            max={maxPrice || 200}
             step={5}
             onValueChange={(value) => setPriceRange(value as [number, number])}
             className="mb-2"
