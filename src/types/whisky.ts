@@ -24,6 +24,7 @@ export interface WhiskyBottle {
     floral?: number;
   };
   image_url?: string;
+  username?: string; // Added this property to track which user added/imported this bottle
 }
 
 export interface UserCollection {

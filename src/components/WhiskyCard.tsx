@@ -39,7 +39,7 @@ const WhiskyCard = ({ bottle, reason, onUpdate }: WhiskyCardProps) => {
         onUpdate(updatedBottle);
       }
       
-      // If the bottle has an id and came from a search, store the updated profile
+      // If the bottle has an id and username, store the updated profile
       if (bottle.username && bottle.id) {
         const { error } = await supabase
           .from('user_whisky_profiles')

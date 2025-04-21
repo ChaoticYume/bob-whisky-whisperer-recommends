@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Info } from "lucide-react";
 import { WhiskyBottle } from "@/types/whisky";
+import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -35,7 +36,7 @@ export default function BaxusImport({ onImportComplete }: BaxusImportProps) {
   });
 
   // Load recent searches on component mount
-  useState(() => {
+  useEffect(() => {
     const loadRecentSearches = async () => {
       try {
         const { data, error } = await supabase
