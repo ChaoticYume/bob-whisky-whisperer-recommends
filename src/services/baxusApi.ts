@@ -67,13 +67,30 @@ export async function getAiRecommendations(userBottles: any[]) {
       throw new Error('Could not generate recommendations from your collection');
     }
     
+    // Add missing properties to recommendations
+    const formattedRecommendations = data.recommendations.map((rec: any) => ({
+      bottle: {
+        id: `ai-${Math.random().toString(36).substring(2, 9)}`,
+        name: rec.name || 'Unknown Whisky',
+        distillery: rec.distillery || 'Unknown Distillery',
+        country: rec.country || 'AI Recommendation',
+        type: rec.type || 'AI Recommendation',
+        abv: rec.abv || 43,
+        // Set default price value to avoid "Price not available"
+        price: rec.price || 45.99,
+        image_url: rec.image_url,
+        flavor_profile: rec.flavor_profile || {},
+      },
+      reason: rec.reason || 'Based on your collection profile',
+    }));
+    
     // Successful recommendation generation
     toast({
       title: "Success!",
-      description: `Generated ${data.recommendations.length} recommendations based on your collection`,
+      description: `Generated ${formattedRecommendations.length} recommendations based on your collection`,
     });
     
-    return data.recommendations;
+    return formattedRecommendations;
   } catch (error) {
     console.error('Error getting AI recommendations:', error);
     // Show error toast

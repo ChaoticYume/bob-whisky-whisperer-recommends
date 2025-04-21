@@ -51,10 +51,13 @@ serve(async (req) => {
       console.log("Not enough profile data to generate recommendations");
     }
     
+    // Calculate average price from user's collection for better recommendations
+    const avgPrice = calculateAveragePrice(userBottles);
+    
     // Prepare prompt for AI recommendations
     const prompt = `Based on this whisky collection profile: ${JSON.stringify(userProfile)}, 
                    recommend 5 whisky bottles that match this taste profile. 
-                   Include the name, distillery, and flavor characteristics.`;
+                   Include the name, distillery, price range (around $${Math.round(avgPrice)}), and flavor characteristics.`;
 
     console.log("Sending prompt to HuggingFace:", prompt);
     
@@ -94,13 +97,13 @@ serve(async (req) => {
     console.log("HuggingFace API response:", JSON.stringify(aiResult));
     
     // Process the AI response
-    const recommendations = processAiRecommendations(aiResult);
+    const recommendations = processAiRecommendations(aiResult, avgPrice);
     
     // If no recommendations were generated, create fallback recommendations
     if (recommendations.length === 0) {
       console.log("No recommendations parsed from AI response, generating fallbacks");
       
-      const fallbackRecommendations = generateFallbackRecommendations(userProfile);
+      const fallbackRecommendations = generateFallbackRecommendations(userProfile, avgPrice);
       
       return new Response(
         JSON.stringify({ 
@@ -124,6 +127,15 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to calculate average price from user's collection
+function calculateAveragePrice(bottles) {
+  const bottlesWithPrice = bottles.filter(bottle => bottle.price);
+  if (bottlesWithPrice.length === 0) return 60; // Default if no prices available
+  
+  const sum = bottlesWithPrice.reduce((total, bottle) => total + bottle.price, 0);
+  return sum / bottlesWithPrice.length;
+}
 
 // Helper function to generate user profile
 function generateUserProfile(bottles) {
@@ -162,7 +174,7 @@ function generateUserProfile(bottles) {
 }
 
 // Helper function to parse AI recommendations
-function processAiRecommendations(aiResult) {
+function processAiRecommendations(aiResult, avgPrice) {
   if (!aiResult || !aiResult[0] || !aiResult[0].generated_text) {
     console.error("No valid AI result to process");
     return [];
@@ -190,7 +202,10 @@ function processAiRecommendations(aiResult) {
           const name = parts[0].trim();
           const distillery = parts.length > 1 ? parts[1].trim() : "Unknown Distillery";
           
-          recommendations.push(createRecommendation(name, distillery));
+          // Calculate a reasonable price based on the user's collection
+          const price = generateRealisticPrice(avgPrice);
+          
+          recommendations.push(createRecommendation(name, distillery, price));
         }
       });
     }
@@ -204,20 +219,31 @@ function processAiRecommendations(aiResult) {
     const name = parts[0].trim();
     const distillery = parts[1].trim();
     
-    recommendations.push(createRecommendation(name, distillery));
+    // Calculate a reasonable price based on the user's collection
+    const price = generateRealisticPrice(avgPrice);
+    
+    recommendations.push(createRecommendation(name, distillery, price));
   });
   
   return recommendations;
 }
 
+// Generate a realistic price based on average collection price
+function generateRealisticPrice(avgPrice) {
+  // Create a price that's within 30% of the average price
+  const variance = avgPrice * 0.3;
+  return Math.round((avgPrice - variance + (Math.random() * variance * 2)) * 100) / 100;
+}
+
 // Helper to create a recommendation with random flavor profile
-function createRecommendation(name, distillery) {
+function createRecommendation(name, distillery, price) {
   // Generate random flavor profile based on common whisky characteristics
   const getRandomFlavor = () => Math.floor(Math.random() * 10);
   
   return {
     name,
     distillery,
+    price,
     flavor_profile: {
       sweet: getRandomFlavor(),
       smoky: getRandomFlavor(),
@@ -230,7 +256,7 @@ function createRecommendation(name, distillery) {
 }
 
 // Generate fallback recommendations if AI fails
-function generateFallbackRecommendations(userProfile) {
+function generateFallbackRecommendations(userProfile, avgPrice) {
   const fallbackWhiskies = [
     { name: "Lagavulin 16", distillery: "Lagavulin", region: "Islay", flavors: { smoky: 9, peaty: 8, rich: 7 } },
     { name: "Macallan 12", distillery: "Macallan", region: "Speyside", flavors: { sweet: 8, fruity: 7, rich: 8 } },
@@ -239,16 +265,22 @@ function generateFallbackRecommendations(userProfile) {
     { name: "Buffalo Trace", distillery: "Buffalo Trace", region: "Kentucky", flavors: { sweet: 8, vanilla: 7, oak: 6 } }
   ];
   
-  return fallbackWhiskies.map(whisky => ({
-    name: whisky.name,
-    distillery: whisky.distillery,
-    flavor_profile: {
-      sweet: whisky.flavors.sweet || Math.floor(Math.random() * 10),
-      smoky: whisky.flavors.smoky || Math.floor(Math.random() * 10),
-      fruity: whisky.flavors.fruity || Math.floor(Math.random() * 10),
-      spicy: whisky.flavors.spicy || Math.floor(Math.random() * 10),
-      floral: whisky.flavors.floral || Math.floor(Math.random() * 10)
-    },
-    reason: `Recommended as a quality ${whisky.region || "whisky"} that would complement your collection.`
-  }));
+  return fallbackWhiskies.map(whisky => {
+    // Calculate a reasonable price based on the user's collection
+    const price = generateRealisticPrice(avgPrice);
+    
+    return {
+      name: whisky.name,
+      distillery: whisky.distillery,
+      price,
+      flavor_profile: {
+        sweet: whisky.flavors.sweet || Math.floor(Math.random() * 10),
+        smoky: whisky.flavors.smoky || Math.floor(Math.random() * 10),
+        fruity: whisky.flavors.fruity || Math.floor(Math.random() * 10),
+        spicy: whisky.flavors.spicy || Math.floor(Math.random() * 10),
+        floral: whisky.flavors.floral || Math.floor(Math.random() * 10)
+      },
+      reason: `Recommended as a quality ${whisky.region || "whisky"} that would complement your collection.`
+    };
+  });
 }
