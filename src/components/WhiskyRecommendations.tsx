@@ -13,6 +13,7 @@ interface WhiskyRecommendationsProps {
   userBottles: WhiskyBottle[];
   onGetAiRecommendations: () => void;
   isLoadingAi: boolean;
+  onBottleUpdate?: (bottle: WhiskyBottle) => void;
 }
 
 const ITEMS_PER_PAGE = 6;
@@ -20,7 +21,8 @@ const ITEMS_PER_PAGE = 6;
 export default function WhiskyRecommendations({
   userBottles,
   onGetAiRecommendations,
-  isLoadingAi
+  isLoadingAi,
+  onBottleUpdate
 }: WhiskyRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<{ bottle: WhiskyBottle; reason: string }[]>([]);
@@ -39,6 +41,28 @@ export default function WhiskyRecommendations({
   const handleGetRecommendations = () => {
     setHasAttemptedRecommendations(true);
     onGetAiRecommendations();
+  };
+
+  const handleBottleUpdate = (updatedBottle: WhiskyBottle) => {
+    if (onBottleUpdate) {
+      onBottleUpdate(updatedBottle);
+    }
+    
+    // Update local recommendations state as well
+    const updatedRecommendations = recommendations.map(rec => 
+      rec.bottle.id === updatedBottle.id 
+        ? { ...rec, bottle: updatedBottle } 
+        : rec
+    );
+    setRecommendations(updatedRecommendations);
+    
+    // Update filtered recommendations
+    const updatedFilteredRecommendations = filteredRecommendations.map(rec => 
+      rec.bottle.id === updatedBottle.id 
+        ? { ...rec, bottle: updatedBottle } 
+        : rec
+    );
+    setFilteredRecommendations(updatedFilteredRecommendations);
   };
 
   // This function is called when recommendations are updated from parent
@@ -151,6 +175,7 @@ export default function WhiskyRecommendations({
                 key={recommendation.bottle.id}
                 bottle={recommendation.bottle}
                 reason={recommendation.reason}
+                onUpdate={handleBottleUpdate}
               />
             ))}
           </div>

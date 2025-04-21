@@ -1,14 +1,23 @@
 
+import { useState } from "react";
 import { WhiskyBottle } from "@/types/whisky";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
+import TasteProfileEditor from "./TasteProfileEditor";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface WhiskyCardProps {
   bottle: WhiskyBottle;
   reason?: string;
+  onUpdate?: (updatedBottle: WhiskyBottle) => void;
 }
 
-const WhiskyCard = ({ bottle, reason }: WhiskyCardProps) => {
+const WhiskyCard = ({ bottle, reason, onUpdate }: WhiskyCardProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const { toast } = useToast();
   const placeholderImage = "https://placehold.co/400x500/e9d8c2/5d4037?text=Whisky";
   
   // Format price with currency if available
@@ -23,6 +32,52 @@ const WhiskyCard = ({ bottle, reason }: WhiskyCardProps) => {
     .slice(0, 3)
     .map(([key]) => key);
   
+  const handleSaveProfile = async (updatedBottle: WhiskyBottle) => {
+    try {
+      // Update the whisky bottle with new flavor profile
+      if (onUpdate) {
+        onUpdate(updatedBottle);
+      }
+      
+      // If the bottle has an id and came from a search, store the updated profile
+      if (bottle.username && bottle.id) {
+        const { error } = await supabase
+          .from('user_whisky_profiles')
+          .upsert({
+            bottle_id: bottle.id,
+            username: bottle.username,
+            flavor_profile: updatedBottle.flavor_profile
+          });
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Profile Updated",
+          description: "Taste profile has been saved to database",
+        });
+      }
+      
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error saving taste profile:", error);
+      toast({
+        title: "Update Failed",
+        description: "Could not save taste profile",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <TasteProfileEditor 
+        bottle={bottle} 
+        onSave={handleSaveProfile}
+        onCancel={() => setIsEditing(false)}
+      />
+    );
+  }
+
   return (
     <Card className="whisky-card h-full flex flex-col overflow-hidden">
       <div className="h-48 overflow-hidden relative">
@@ -39,7 +94,7 @@ const WhiskyCard = ({ bottle, reason }: WhiskyCardProps) => {
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div>
-            <CardDescription className="text-whisky-wood/70">{bottle.distillery}</CardDescription>
+            <p className="text-whisky-wood/70">{bottle.distillery}</p>
             <div className="flex gap-2 mt-1">
               {bottle.age && (
                 <Badge variant="outline" className="border-whisky-amber/30 text-whisky-brown">
@@ -72,7 +127,17 @@ const WhiskyCard = ({ bottle, reason }: WhiskyCardProps) => {
         
         {topFlavors.length > 0 && (
           <div>
-            <p className="text-sm text-whisky-wood/70 mb-1">Top flavor notes:</p>
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-whisky-wood/70 mb-1">Top flavor notes:</p>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-1 h-auto text-whisky-amber hover:text-whisky-gold" 
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-1">
               {topFlavors.map(flavor => (
                 <span 

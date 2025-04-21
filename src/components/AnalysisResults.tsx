@@ -7,12 +7,14 @@ interface AnalysisResultsProps {
   userBottles: WhiskyBottle[];
   onGetAiRecommendations: () => void;
   isLoadingAi: boolean;
+  onBottleUpdate?: (bottle: WhiskyBottle) => void;
 }
 
 export default function AnalysisResults({ 
   userBottles, 
   onGetAiRecommendations,
-  isLoadingAi
+  isLoadingAi,
+  onBottleUpdate
 }: AnalysisResultsProps) {
   return (
     <div id="results" className="space-y-16 pt-8">
@@ -28,6 +30,7 @@ export default function AnalysisResults({
         userBottles={userBottles}
         onGetAiRecommendations={onGetAiRecommendations}
         isLoadingAi={isLoadingAi}
+        onBottleUpdate={onBottleUpdate}
       />
     </div>
   );

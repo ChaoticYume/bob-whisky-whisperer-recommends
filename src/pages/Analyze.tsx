@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,6 +9,8 @@ import { getAiRecommendations } from "@/services/baxusApi";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisHeader from "@/components/AnalysisHeader";
 import AnalysisResults from "@/components/AnalysisResults";
+import BaxusImport from "@/components/BaxusImport";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STORAGE_KEYS = {
   USER_BOTTLES: 'baxus_user_bottles',
@@ -369,6 +372,10 @@ const Analyze = () => {
     }, 100);
   };
 
+  const handleBaxusImport = (bottles: WhiskyBottle[]) => {
+    handleFileUpload(bottles);
+  };
+
   const handleAiRecommendations = async () => {
     setErrorMessage(null);
     
@@ -412,6 +419,27 @@ const Analyze = () => {
       setIsLoadingAi(false);
     }
   };
+
+  const handleBottleUpdate = (updatedBottle: WhiskyBottle) => {
+    // Update bottle in userBottles if it exists there
+    const updatedUserBottles = userBottles.map(bottle => 
+      bottle.id === updatedBottle.id ? updatedBottle : bottle
+    );
+    setUserBottles(updatedUserBottles);
+    
+    // Update bottle in recommendations if it exists there
+    const updatedRecommendations = recommendations.map(rec => 
+      rec.bottle.id === updatedBottle.id 
+        ? { ...rec, bottle: updatedBottle } 
+        : rec
+    );
+    setRecommendations(updatedRecommendations);
+    
+    // Update window reference for WhiskyRecommendations component
+    if (typeof window !== 'undefined' && (window as any).updateWhiskyRecommendations) {
+      (window as any).updateWhiskyRecommendations(updatedRecommendations);
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -422,7 +450,18 @@ const Analyze = () => {
           <AnalysisHeader errorMessage={errorMessage} />
           
           <div className="mb-16">
-            <FileUpload onUpload={handleFileUpload} />
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+                <TabsTrigger value="upload">Upload CSV</TabsTrigger>
+                <TabsTrigger value="baxus">Import from Baxus</TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload">
+                <FileUpload onUpload={handleFileUpload} />
+              </TabsContent>
+              <TabsContent value="baxus">
+                <BaxusImport onImportComplete={handleBaxusImport} />
+              </TabsContent>
+            </Tabs>
           </div>
           
           {analysisComplete && (
@@ -430,6 +469,7 @@ const Analyze = () => {
               userBottles={userBottles}
               onGetAiRecommendations={handleAiRecommendations}
               isLoadingAi={isLoadingAi}
+              onBottleUpdate={handleBottleUpdate}
             />
           )}
         </div>
