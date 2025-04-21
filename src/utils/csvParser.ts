@@ -18,10 +18,10 @@ export const parseCSV = (csvContent: string): WhiskyBottle[] => {
     const bottle: Partial<WhiskyBottle> = {
       id: values[headers.indexOf('id')] || `bottle-${i}`,
       name: values[headers.indexOf('name')] || '',
-      distillery: values[headers.indexOf('distillery')] || '',
+      distillery: values[headers.indexOf('brand_id')] || '', // Map brand_id to distillery
       region: values[headers.indexOf('region')],
       country: values[headers.indexOf('country')] || 'Unknown',
-      type: values[headers.indexOf('type')] || 'Unknown',
+      type: values[headers.indexOf('spirit_type')] || 'Unknown',
       flavor_profile: {}
     };
     
@@ -36,9 +36,27 @@ export const parseCSV = (csvContent: string): WhiskyBottle[] => {
       bottle.abv = parseFloat(values[abvIndex]) || 0;
     }
     
+    // Parse price - check multiple price fields
+    const msrpIndex = headers.indexOf('avg_msrp');
+    const fairPriceIndex = headers.indexOf('fair_price');
+    const shelfPriceIndex = headers.indexOf('shelf_price');
     const priceIndex = headers.indexOf('price');
-    if (priceIndex !== -1 && values[priceIndex]) {
+    
+    // Try to get price from any available source in order of preference
+    if (msrpIndex !== -1 && values[msrpIndex]) {
+      bottle.price = parseFloat(values[msrpIndex]) || undefined;
+    } else if (fairPriceIndex !== -1 && values[fairPriceIndex]) {
+      bottle.price = parseFloat(values[fairPriceIndex]) || undefined;
+    } else if (shelfPriceIndex !== -1 && values[shelfPriceIndex]) {
+      bottle.price = parseFloat(values[shelfPriceIndex]) || undefined;
+    } else if (priceIndex !== -1 && values[priceIndex]) {
       bottle.price = parseFloat(values[priceIndex]) || undefined;
+    }
+    
+    // Parse image URL
+    const imageIndex = headers.indexOf('image_url');
+    if (imageIndex !== -1 && values[imageIndex]) {
+      bottle.image_url = values[imageIndex];
     }
     
     // Parse flavor profile
@@ -63,8 +81,8 @@ export const parseCSV = (csvContent: string): WhiskyBottle[] => {
 
 export const generateSampleCSV = (): string => {
   const headers = [
-    'id', 'name', 'distillery', 'region', 'country', 'type', 
-    'age', 'abv', 'price', 'smoky', 'peaty', 'spicy', 'herbal', 
+    'id', 'name', 'distillery', 'region', 'country', 'spirit_type', 
+    'age', 'abv', 'avg_msrp', 'smoky', 'peaty', 'spicy', 'herbal', 
     'oily', 'body', 'rich', 'sweet', 'salty', 'vanilla', 'fruity', 'floral'
   ].join(',');
   

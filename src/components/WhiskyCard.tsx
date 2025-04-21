@@ -39,21 +39,15 @@ const WhiskyCard = ({ bottle, reason, onUpdate }: WhiskyCardProps) => {
         onUpdate(updatedBottle);
       }
       
-      // If the bottle has an id and username, store the updated profile
-      if (bottle.username && bottle.id) {
-        const { error } = await supabase
-          .from('user_whisky_profiles')
-          .upsert({
-            bottle_id: bottle.id,
-            username: bottle.username,
-            flavor_profile: updatedBottle.flavor_profile
-          });
-          
-        if (error) throw error;
+      // Store the updated taste profile in localStorage for now
+      // This is a fallback since we don't have a proper table in Supabase yet
+      if (bottle.id && bottle.username) {
+        const storageKey = `whisky_profile_${bottle.id}_${bottle.username}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedBottle.flavor_profile));
         
         toast({
           title: "Profile Updated",
-          description: "Taste profile has been saved to database",
+          description: "Taste profile has been saved locally",
         });
       }
       
