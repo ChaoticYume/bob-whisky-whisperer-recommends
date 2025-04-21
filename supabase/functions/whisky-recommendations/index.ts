@@ -32,6 +32,7 @@ serve(async (req) => {
 
     const accessToken = Deno.env.get("HUGGINGFACE_API_KEY");
     if (!accessToken) {
+      console.error("Missing HUGGINGFACE_API_KEY environment variable");
       return new Response(
         JSON.stringify({ error: 'HuggingFace API key not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -61,64 +62,99 @@ serve(async (req) => {
 
     console.log("Sending prompt to HuggingFace:", prompt);
     
-    // Call HuggingFace API for recommendations
-    const response = await fetch("https://api-inference.huggingface.co/models/facebook/bart-large", {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        inputs: prompt, 
-        parameters: { max_length: 500 } 
-      }),
-    });
+    try {
+      // Call HuggingFace API for recommendations
+      const response = await fetch("https://api-inference.huggingface.co/models/facebook/bart-large", {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          inputs: prompt, 
+          parameters: { max_length: 500 } 
+        }),
+      });
 
-    if (!response.ok) {
-      let errorText = 'Failed to get recommendations from HuggingFace API';
-      try {
-        const errorData = await response.json();
-        errorText = errorData.error || errorText;
-        console.error("HuggingFace API error:", errorText);
-      } catch (e) {
-        errorText = await response.text();
-        console.error("HuggingFace API error (raw):", errorText);
+      if (!response.ok) {
+        let errorText = 'Failed to get recommendations from HuggingFace API';
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || errorText;
+          console.error("HuggingFace API error:", errorText);
+        } catch (e) {
+          errorText = await response.text();
+          console.error("HuggingFace API error (raw):", errorText);
+        }
+        
+        // Generate fallback recommendations instead of failing
+        console.log("Using fallback recommendations due to API error");
+        const fallbackRecommendations = generateFallbackRecommendations(userProfile, avgPrice);
+        
+        return new Response(
+          JSON.stringify({ 
+            recommendations: fallbackRecommendations,
+            note: "Used fallback recommendations due to AI service error"
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      const aiResult = await response.json();
+      console.log("HuggingFace API response:", JSON.stringify(aiResult));
+      
+      // Check if the API returned valid data
+      if (!aiResult || !aiResult[0] || !aiResult[0].generated_text) {
+        console.error("Invalid or empty AI response:", aiResult);
+        // Generate fallback recommendations
+        const fallbackRecommendations = generateFallbackRecommendations(userProfile, avgPrice);
+        
+        return new Response(
+          JSON.stringify({ 
+            recommendations: fallbackRecommendations,
+            ai_response_raw: aiResult,
+            note: "Used fallback recommendations due to invalid AI response format"
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Process the AI response
+      const recommendations = processAiRecommendations(aiResult, avgPrice);
+      
+      // If no recommendations were generated, create fallback recommendations
+      if (recommendations.length === 0) {
+        console.log("No recommendations parsed from AI response, generating fallbacks");
+        
+        const fallbackRecommendations = generateFallbackRecommendations(userProfile, avgPrice);
+        
+        return new Response(
+          JSON.stringify({ 
+            recommendations: fallbackRecommendations,
+            ai_response_raw: aiResult,
+            note: "Used fallback recommendations due to AI processing issue"
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       return new Response(
-        JSON.stringify({ 
-          error: errorText
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
+        JSON.stringify({ recommendations }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-    
-    const aiResult = await response.json();
-    console.log("HuggingFace API response:", JSON.stringify(aiResult));
-    
-    // Process the AI response
-    const recommendations = processAiRecommendations(aiResult, avgPrice);
-    
-    // If no recommendations were generated, create fallback recommendations
-    if (recommendations.length === 0) {
-      console.log("No recommendations parsed from AI response, generating fallbacks");
-      
+    } catch (apiError) {
+      console.error("API call failed:", apiError);
+      // Generate fallback recommendations if the API call fails
       const fallbackRecommendations = generateFallbackRecommendations(userProfile, avgPrice);
       
       return new Response(
         JSON.stringify({ 
           recommendations: fallbackRecommendations,
-          ai_response_raw: aiResult,
-          note: "Used fallback recommendations due to AI processing issue"
+          note: "Used fallback recommendations due to API error"
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    return new Response(
-      JSON.stringify({ recommendations }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error:', error);
     return new Response(

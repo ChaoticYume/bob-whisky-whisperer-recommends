@@ -54,7 +54,7 @@ export async function getAiRecommendations(userBottles: any[]) {
     
     if (error) {
       console.error('Supabase function error:', error);
-      throw new Error(error.message);
+      throw new Error(error.message || 'Error getting recommendations');
     }
     
     // Handle errors returned within the success response
@@ -67,7 +67,7 @@ export async function getAiRecommendations(userBottles: any[]) {
       throw new Error('Could not generate recommendations from your collection');
     }
     
-    // Add missing properties to recommendations
+    // Add missing properties to recommendations and ensure prices are properly formatted
     const formattedRecommendations = data.recommendations.map((rec: any) => ({
       bottle: {
         id: `ai-${Math.random().toString(36).substring(2, 9)}`,
@@ -76,10 +76,16 @@ export async function getAiRecommendations(userBottles: any[]) {
         country: rec.country || 'AI Recommendation',
         type: rec.type || 'AI Recommendation',
         abv: rec.abv || 43,
-        // Set default price value to avoid "Price not available"
-        price: rec.price || 45.99,
-        image_url: rec.image_url,
-        flavor_profile: rec.flavor_profile || {},
+        // Ensure price is always a number
+        price: typeof rec.price === 'number' ? rec.price : parseFloat(rec.price) || 45.99,
+        image_url: rec.image_url || 'https://d1w35me0y6a2bb.cloudfront.net/placeholders/whisky-bottle-placeholder.png',
+        flavor_profile: rec.flavor_profile || {
+          sweet: 5,
+          smoky: 3,
+          fruity: 4,
+          spicy: 3,
+          floral: 2
+        },
       },
       reason: rec.reason || 'Based on your collection profile',
     }));
